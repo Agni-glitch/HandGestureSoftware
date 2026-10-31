@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Per-user values written by the calibration tool.
+calibration.json
+# Your settings, custom gestures and log.
+user_data/
+# Fetched by scripts/download_model.py and verified against a pinned hash.
+models/*.task
+models/*.download
+# Tools and editors.
+.ruff_cache/
+.claude/
+.idea/
+.vscode/
+Thumbs.db
+# Made by scripts/build_exe.py.
+build/
+_internal/
+HandGestureControl.exe
+Hand Gesture Control.lnk

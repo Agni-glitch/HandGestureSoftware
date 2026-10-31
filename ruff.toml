@@ -1,0 +1,12 @@
+line-length = 120
+target-version = "py310"
+extend-exclude = ["_internal"]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+
+[lint.per-file-ignores]
+# These add the project folder to the import path before importing from it.
+"scripts/*.py" = ["E402"]
+# PyInstaller provides these names when it runs the recipe.
+"scripts/*.spec" = ["F821"]

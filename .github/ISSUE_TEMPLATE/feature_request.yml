@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a new gesture or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe what you need, rather than a particular solution.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+      description: For a new gesture, describe the hand pose and what it should do.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried instead?
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Helping out
+      options:
+        - label: I'd like to work on this myself

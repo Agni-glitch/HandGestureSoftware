@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest==9.2.0
+ruff==0.17.3
+# For scripts/make_icon.py only.
+pillow==13.0.0
+# For scripts/build_exe.py only.
+pyinstaller==6.22.3

@@ -1,0 +1,63 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. For a security problem, please follow SECURITY.md instead.
+        Check the Troubleshooting section of the README first, as it covers the most common problems.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also say what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen?
+      placeholder: |
+        1. Press Start
+        2. Hold up a fist
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: run-method
+    attributes:
+      label: How do you run the app?
+      options:
+        - Release zip
+        - .exe I built myself
+        - From source (app.pyw)
+        - Command line (main.py)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown at the bottom of the Settings page.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: input
+    id: camera
+    attributes:
+      label: Camera, if the problem involves tracking
+      placeholder: Built-in laptop webcam, in daylight
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Relevant lines from user_data/app.log. Check them for anything private before posting.
+      render: text

@@ -1,0 +1,6 @@
+* text=auto
+
+*.ico binary
+*.npz binary
+*.png binary
+*.task binary

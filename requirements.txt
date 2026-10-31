@@ -1,0 +1,20 @@
+# Runtime dependencies. Versions are exact, with markers where the correct
+# release depends on the Python version or the OS.
+mediapipe==1.2.0
+pynput==1.8.2
+PySide6-Essentials==6.12.0
+psutil==7.2.2
+
+# NumPy dropped Python 3.10 and 3.11 in later releases.
+numpy==2.2.6; python_version < "3.11"
+numpy==2.4.6; python_version == "3.11"
+numpy==2.5.4; python_version >= "3.12"
+
+# This replaces opencv-python: MediaPipe depends on the contrib build, and the
+# two packages overwrite each other's cv2 files if both are installed.
+opencv-contrib-python==5.0.0.93; sys_platform != "darwin"
+opencv-contrib-python==4.10.0.84; sys_platform == "darwin"
+
+# Windows system volume (macOS and Linux use osascript and pactl).
+pycaw==20260927; sys_platform == "win32"
+comtypes==1.4.17; sys_platform == "win32"
