@@ -3,7 +3,8 @@
 import pytest
 
 from config import AppConfig
-from gesture_control.actions import ActionMapper, Mode
+from gesture_control.actions import ActionMapper, MapperStatus, Mode
+from gesture_control.engine import GestureEngine
 from gesture_control.profile import Profile, default_bindings
 from gesture_control.recognizer import Gesture, GestureReading
 from gesture_control.router import ProfileRouter
@@ -274,6 +275,41 @@ def test_fingertip_outside_the_region_stays_on_screen():
     enter_pointer(s)
     s.hold(frames=30, gesture=Gesture.POINTER, tip=(1.0, 1.0))
     assert s.os.cursor[-1][0] <= 999 and s.os.cursor[-1][1] <= 499
+
+
+def test_status_reports_where_the_cursor_is_only_in_pointer_mode():
+    s = Session()
+    assert s.hold(frames=2).cursor is None
+    enter_pointer(s)
+    x0, y0, x1, y1 = s.cfg.pointer.active_region
+    status = s.hold(frames=60, gesture=Gesture.POINTER, tip=(x1, y1))
+    assert status.cursor == pytest.approx((1.0, 1.0), abs=0.01)
+    s.hold(gesture=Gesture.OPEN_PALM)
+    assert s.mapper.mode is Mode.IDLE
+    assert s.hold(frames=2).cursor is None
+
+
+def test_reported_cursor_stays_put_during_a_click():
+    s = Session()
+    enter_pointer(s)
+    s.hold(frames=30, gesture=Gesture.POINTER, tip=(0.5, 0.4))
+    before = s.hold(frames=1, gesture=Gesture.POINTER, tip=(0.5, 0.4)).cursor
+    during = s.hold(frames=5, gesture=Gesture.POINTER, pinch=True, ratio=0.1, tip=(0.51, 0.41)).cursor
+    assert during == before
+
+
+def test_engine_reports_the_cursor_first_then_the_fingertip():
+    engine = GestureEngine.__new__(GestureEngine)
+    engine.cfg = AppConfig()
+    x0, y0, x1, y1 = engine.cfg.pointer.active_region
+    assert engine._screen_position(None, MapperStatus(Mode.IDLE, Gesture.NONE, 0.0)) is None
+    idle = MapperStatus(Mode.IDLE, Gesture.NONE, 0.0)
+    assert engine._screen_position(reading(tip=(x0, y1)), idle) == pytest.approx((0.0, 1.0))
+    # Beyond the rectangle, the position stops at the edge of the screen, as the cursor does.
+    assert engine._screen_position(reading(tip=(0.0, 0.0)), idle) == pytest.approx((0.0, 0.0))
+    pointing = MapperStatus(Mode.POINTER, Gesture.POINTER, 1.0, cursor=(0.25, 0.75))
+    assert engine._screen_position(reading(tip=(x0, y1)), pointing) == (0.25, 0.75)
+    assert engine._screen_position(None, pointing) == (0.25, 0.75)
 
 
 def test_pinch_clicks_in_pointer_mode_and_does_not_touch_volume():

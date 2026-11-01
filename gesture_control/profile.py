@@ -110,6 +110,8 @@ class ConnectedApp:
 class GeneralSettings:
     camera_index: int = 0
     show_preview: bool = True
+    pin_camera: bool = True
+    pin_corner: str = "bottom_right"
     start_engine_on_launch: bool = False
     close_to_tray: bool = True
     practice_mode: bool = False

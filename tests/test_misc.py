@@ -165,6 +165,16 @@ def test_every_hud_state_renders(status, shape):
     assert img.std() > 0  # Something was drawn.
 
 
+@pytest.mark.parametrize("hand", [None, make_hand()])
+@pytest.mark.parametrize("mouse_down", [False, True])
+def test_compact_hud_renders_with_and_without_a_hand(hand, mouse_down):
+    cfg = AppConfig()
+    img = np.full((480, 640, 3), 90, np.uint8)
+    status = MapperStatus(Mode.POINTER, Gesture.POINTER, 1.0, mouse_down=mouse_down)
+    Overlay(cfg.ui, cfg.pointer).draw_compact(img, hand, status)
+    assert img.std() > 0  # The active region, at least.
+
+
 def test_detector_runs_on_an_empty_frame_with_repeated_timestamps():
     cfg = AppConfig()
     if not cfg.detection.model_path.exists():

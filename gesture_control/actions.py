@@ -55,8 +55,17 @@ class MapperStatus:
     volume_target: float | None = None
     volume_engaged: bool = False
     mouse_down: bool = False
+    cursor: tuple[float, float] | None = None  # Where the cursor is, as a fraction of the screen.
     flash: str | None = None
     flash_at: float = 0.0
+
+
+def screen_fraction(
+    region: tuple[float, float, float, float], tip: tuple[float, float]
+) -> np.ndarray:
+    """Where a fingertip in the camera picture lands on the screen, from 0 to 1 on each axis."""
+    x0, y0, x1, y1 = region
+    return np.clip(np.array([(tip[0] - x0) / (x1 - x0), (tip[1] - y0) / (y1 - y0)]), 0.0, 1.0)
 
 
 class VolumeSession:
@@ -143,10 +152,8 @@ class CursorController:
 
     def update(self, reading: GestureReading, t: float) -> bool:
         """Returns True on the frame a click starts."""
-        x0, y0, x1, y1 = self.cfg.active_region
         width, height = self.os.screen_size
-        tip_x, tip_y = reading.index_tip
-        norm = np.clip(np.array([(tip_x - x0) / (x1 - x0), (tip_y - y0) / (y1 - y0)]), 0.0, 1.0)
+        norm = screen_fraction(self.cfg.active_region, reading.index_tip)
         self._pos = self._filter(norm, t) * np.array([width - 1, height - 1])
 
         clicked = self._update_button(reading, t)
@@ -198,6 +205,14 @@ class CursorController:
             return
         self.os.move_cursor(int(self._pos[0]), int(self._pos[1]))
         self._last_sent = self._pos.copy()
+
+    @property
+    def position(self) -> tuple[float, float] | None:
+        """Where the cursor was last sent, as a fraction of the screen."""
+        if self._last_sent is None:
+            return None
+        width, height = self.os.screen_size
+        return float(self._last_sent[0]) / (width - 1), float(self._last_sent[1]) / (height - 1)
 
     def release(self) -> None:
         if self.button_down:
@@ -364,6 +379,7 @@ class ActionMapper:
             status.volume_engaged = self._volume.engaged
         if self._cursor is not None:
             status.mouse_down = self._cursor.button_down
+            status.cursor = self._cursor.position
         return status
 
     def close(self, t: float) -> None:

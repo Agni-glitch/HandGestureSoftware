@@ -11,15 +11,16 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QImage
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QPushButton, QWidget
 
 from config import ROOT, RecognizerConfig
 from gesture_control import shell_integration
+from gesture_control.actions import MapperStatus, Mode
 from gesture_control.custom_gestures import READY_POSES, build_outline, pose_features
-from gesture_control.engine import Sampler
+from gesture_control.engine import EngineStats, Sampler
 from gesture_control.gui import widgets as ui
 from gesture_control.gui.capture_dialog import RECORDING_TIPS, CalibrationDialog, RecordPoseDialog
 from gesture_control.gui.editors import ActionPicker, GestureEditor, MoreOptions, StepEditor, StepsDialog
@@ -35,6 +36,7 @@ from gesture_control.gui.illustrations import (
     frame_at,
 )
 from gesture_control.gui.main_window import MainWindow, _ActivityHandler
+from gesture_control.gui.mini_view import caption, corner_position
 from gesture_control.gui.pages import AppOverridesDialog, DemoDialog, connected_summary, gesture_summary
 from gesture_control.gui.state import AppState, EngineController
 from gesture_control.gui.wizard import OWN_POSE, GestureWizard, TryItPanel
@@ -80,6 +82,7 @@ def env(app, tmp_path, monkeypatch):
     yield e
     controller.shutdown()
     window.really_quit = True
+    window.mini_view.deleteLater()
     window.deleteLater()
 
 
@@ -1155,3 +1158,178 @@ def test_quit_shuts_the_engine_down(env, monkeypatch):
     env.window.show()
     env.window.quit_app()
     assert stopped == [True]
+
+
+# The pinned camera
+
+
+def run_engine(env, status=EngineController.RUNNING):
+    env.controller.engine = FakeEngine()
+    env.controller._set_status(status)
+
+
+def live_stats(mode=Mode.IDLE, gesture=Gesture.NONE, tracking=True, position=None, **status):
+    return EngineStats(30.0, 11.0, tracking, MapperStatus(mode, gesture, 0.0, **status), position)
+
+
+@pytest.fixture
+def running_env(env):
+    env.window.show()
+    run_engine(env)
+    yield env
+    env.controller.engine = None
+    env.controller._set_status(EngineController.STOPPED)
+
+
+def test_camera_is_pinned_only_while_running_and_minimized(running_env):
+    env = running_env
+    mini = env.window.mini_view
+    assert not mini.isVisible()
+    env.window.showMinimized()
+    assert mini.isVisible()
+    assert env.controller.engine.compact_preview
+    env.window.showNormal()
+    assert not mini.isVisible()
+    assert not env.controller.engine.compact_preview
+
+
+def test_camera_is_pinned_while_in_the_tray(running_env, monkeypatch):
+    env = running_env
+    env.window.hide()
+    assert env.window.mini_view.isVisible()
+    env.window.show_window()
+    assert not env.window.mini_view.isVisible()
+
+
+def test_minimizing_before_starting_pins_the_camera_on_start(env):
+    env.window.show()
+    env.window.showMinimized()
+    assert not env.window.mini_view.isVisible()
+    run_engine(env, EngineController.STARTING)
+    assert env.window.mini_view.isVisible()
+    env.controller.engine = None
+    env.controller._set_status(EngineController.STOPPED)
+    assert not env.window.mini_view.isVisible()
+
+
+def test_recording_a_pose_never_pins_the_camera(env):
+    env.window.hide()
+    env.controller.silent = True
+    run_engine(env)
+    assert not env.window.mini_view.isVisible()
+    env.controller.engine = None
+    env.controller.silent = False
+    env.controller._set_status(EngineController.STOPPED)
+
+
+def test_settings_turn_the_pinned_camera_off_straight_away(running_env):
+    env = running_env
+    env.window.hide()
+    page = env.window.settings
+    page.pin_camera.setChecked(False)
+    assert not env.window.mini_view.isVisible()
+    assert not saved(env).general.pin_camera
+    assert not page.pin_corner.isEnabled()
+    page.pin_camera.setChecked(True)
+    assert env.window.mini_view.isVisible()
+    page.show_preview.setChecked(False)
+    assert not env.window.mini_view.isVisible()
+    assert not page.pin_camera.isEnabled()
+
+
+@pytest.mark.parametrize(
+    "corner, expected",
+    [
+        ("bottom_right", QPoint(100 + 800 - 320 - 12, 50 + 600 - 300 - 12)),
+        ("bottom_left", QPoint(100 + 12, 50 + 600 - 300 - 12)),
+        ("top_right", QPoint(100 + 800 - 320 - 12, 50 + 12)),
+        ("top_left", QPoint(100 + 12, 50 + 12)),
+        ("nonsense from a hand-edited file", QPoint(100 + 800 - 320 - 12, 50 + 600 - 300 - 12)),
+    ],
+)
+def test_pinned_camera_sits_inside_the_chosen_corner(corner, expected):
+    assert corner_position(QRect(100, 50, 800, 600), QSize(320, 300), corner) == expected
+
+
+def test_changing_the_corner_moves_the_pinned_camera(running_env):
+    env = running_env
+    env.window.hide()
+    mini = env.window.mini_view
+    before = mini.pos()
+    page = env.window.settings
+    page.pin_corner.setCurrentIndex(page.pin_corner.findData("top_left"))
+    assert saved(env).general.pin_corner == "top_left"
+    assert mini.pos() != before
+
+
+def test_pinned_camera_lets_input_through_and_stays_on_top(env):
+    flags = env.window.mini_view.windowFlags()
+    assert flags & Qt.WindowTransparentForInput
+    assert flags & Qt.WindowDoesNotAcceptFocus
+    assert flags & Qt.WindowStaysOnTopHint
+    # Windows would minimize it along with a parent, which is exactly when it's needed.
+    assert env.window.mini_view.parent() is None
+    assert env.window.mini_view.testAttribute(Qt.WA_ShowWithoutActivating)
+
+
+def test_pinned_camera_shows_the_gesture_and_where_the_finger_lands(running_env):
+    env = running_env
+    env.window.hide()
+    mini = env.window.mini_view
+    image = np.full((480, 640, 3), 90, np.uint8)
+    stats = live_stats(Mode.POINTER, Gesture.POINTER, position=(0.25, 0.75))
+    env.controller.live_ready.emit(image, stats)
+    assert mini.title.text() == "Pointer"
+    assert mini.detail.text() == "Moving the mouse"
+    assert mini.map.marker[0] == (0.25, 0.75)
+    assert not mini.picture.pixmap().isNull()
+    image = render(mini, mini.sizeHint().width(), mini.sizeHint().height())
+    assert len(distinct_colours(image)) > 3
+
+
+def test_a_frame_arriving_after_the_window_came_back_is_ignored(running_env):
+    env = running_env
+    env.controller.live_ready.emit(np.full((480, 640, 3), 90, np.uint8), live_stats())
+    assert env.window.mini_view.picture.pixmap().isNull()
+
+
+def test_unpinning_forgets_the_last_picture(running_env):
+    env = running_env
+    env.window.hide()
+    mini = env.window.mini_view
+    env.controller.live_ready.emit(np.full((480, 640, 3), 90, np.uint8), live_stats(position=(0.5, 0.5)))
+    assert not mini.picture.pixmap().isNull()
+    env.window.show_window()
+    assert mini.picture.pixmap().isNull()
+    assert mini.map.marker[0] is None
+
+
+@pytest.mark.parametrize(
+    "stats, practice, expected",
+    [
+        (live_stats(tracking=False), False, ("No hand", "", "")),
+        (live_stats(), False, ("Hand seen", "", "")),
+        (live_stats(gesture=Gesture.FIST), False, ("Fist", "", "")),
+        (live_stats(gesture=Gesture.FIST), True, ("Fist", "Practice mode", "")),
+        (live_stats(gesture="open_app"), False, ("Open an app", "", "")),
+        (live_stats(Mode.PAUSED, Gesture.FIST), False, ("Paused", "Gestures are ignored for now", "paused")),
+        (live_stats(Mode.POINTER, Gesture.POINTER), False, ("Pointer", "Moving the mouse", "active")),
+        (live_stats(Mode.POINTER, Gesture.PINCH, mouse_down=True), False, ("Pinch", "Holding the click", "active")),
+        (live_stats(Mode.POINTER, Gesture.POINTER), True, ("Pointer", "Practice: Moving the mouse", "active")),
+        (live_stats(Mode.VOLUME, Gesture.PINCH, volume=0.456), False, ("Pinch", "Changing the volume: 46%", "active")),
+        (live_stats(gesture=Gesture.FIST, flash="PLAY/PAUSE", flash_at=99.5), False, ("Fist", "PLAY/PAUSE", "")),
+        (live_stats(gesture=Gesture.FIST, flash="PLAY/PAUSE", flash_at=10.0), False, ("Fist", "", "")),
+    ],
+)
+def test_pinned_camera_caption(env, stats, practice, expected):
+    assert caption(stats, env.state.profile, practice, now=100.0) == expected
+
+
+def test_a_long_gesture_name_is_shortened_to_fit(running_env):
+    env = running_env
+    env.window.hide()
+    env.state.profile.custom.append(CustomGesture("custom:a", "A very long name " * 10, [0.0], 0.9))
+    env.controller.live_ready.emit(np.full((480, 640, 3), 90, np.uint8), live_stats(gesture="custom:a"))
+    mini = env.window.mini_view
+    assert mini.title.text().endswith("…")
+    assert mini.sizeHint().width() == 320

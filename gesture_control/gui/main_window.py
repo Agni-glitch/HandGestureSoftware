@@ -7,7 +7,7 @@ import logging.handlers
 import os
 import sys
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from config import ROOT
 from gesture_control.gui import theme
 from gesture_control.gui import widgets as ui
+from gesture_control.gui.mini_view import MiniCameraView
 from gesture_control.gui.pages import (
     AppsPage,
     DashboardPage,
@@ -123,9 +124,35 @@ class MainWindow(QMainWindow):
         outer.addWidget(sidebar)
         outer.addWidget(self.stack, 1)
 
+        self.mini_view = MiniCameraView(state, controller)
         controller.state_changed.connect(self._on_state)
         controller.failed.connect(self._on_failed)
+        state.changed.connect(self._sync_mini_view)
         self._on_state(controller.status)
+
+    def _sync_mini_view(self) -> None:
+        general = self.state.profile.general
+        out_of_sight = not self.isVisible() or self.isMinimized()
+        running = self.controller.is_active and not self.controller.silent
+        wanted = out_of_sight and running and general.show_preview and general.pin_camera
+        self.controller.set_compact_preview(wanted)
+        if wanted:
+            self.mini_view.pin()
+        else:
+            self.mini_view.unpin()
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        if event.type() == QEvent.WindowStateChange:
+            self._sync_mini_view()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._sync_mini_view()
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._sync_mini_view()
 
     def _show_welcome(self) -> None:
         self.dashboard.welcome.show()
@@ -144,6 +171,7 @@ class MainWindow(QMainWindow):
             }[status]
         self.sidebar_status.setText(text)
         self._sync_tray()
+        self._sync_mini_view()
 
     def _on_failed(self, error: str) -> None:
         self.dashboard.add_activity(f"Error: {error}")
@@ -205,6 +233,7 @@ class MainWindow(QMainWindow):
                     QSystemTrayIcon.Information,
                 )
             return
+        self.mini_view.unpin()
         self.controller.shutdown()
         if self.tray is not None:
             self.tray.hide()
