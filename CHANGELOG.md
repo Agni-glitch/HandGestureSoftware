@@ -5,6 +5,12 @@ and version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- The pinned camera. While the app is running and minimized or in the tray, a small always-on-top window shows your
+  hand, the gesture it can see, and where your finger lands on the screen. Clicks pass through it. Settings can move it
+  to another corner or turn it off.
+
 ## [1.0.0] - 2026-10-31
 
 First public release.

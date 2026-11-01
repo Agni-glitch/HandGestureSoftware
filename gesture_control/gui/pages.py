@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
@@ -77,6 +78,14 @@ def connected_summary(profile: Profile, running: set[str]) -> tuple[int, int]:
     """(connected apps, how many of those are running now)."""
     connected = [a for a in profile.apps if a.enabled]
     return len(connected), sum(1 for a in connected if a.exe in running)
+
+
+def gesture_display_name(profile: Profile, gesture) -> str | None:
+    """The name to show for what the engine has settled on. None when there's no gesture."""
+    name = _BUILTIN_LABELS.get(gesture)
+    if name is None and gesture != Gesture.NONE:
+        name = profile.gesture_name(gesture)
+    return name
 
 
 class DashboardPage(Page):
@@ -235,8 +244,8 @@ class DashboardPage(Page):
             sub.setText("")
 
     def _on_frame(self, image) -> None:
-        # Hidden in the tray or on another page: no need to spend CPU on drawing.
-        if not self.preview.isVisible():
+        # Hidden in the tray, minimized or on another page: no need to spend CPU on drawing.
+        if not self.preview.isVisible() or self.window().isMinimized():
             return
         self.preview.setPixmap(
             bgr_to_pixmap(image).scaled(self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -253,9 +262,7 @@ class DashboardPage(Page):
             value.setText("Practice" if self.controller.practice else "On")
         sub.setText(f"{stats.fps:.0f} frames per second" if stats.fps else "")
 
-        name = _BUILTIN_LABELS.get(status.gesture)
-        if name is None and status.gesture != Gesture.NONE:
-            name = self.state.profile.gesture_name(status.gesture)
+        name = gesture_display_name(self.state.profile, status.gesture)
         self.gesture_tile[0].setText(name or ("Hand seen" if stats.tracking else "-"))
         mode = {"VOLUME": "Changing the volume", "POINTER": "Controlling the mouse"}.get(status.mode.value, "")
         self.gesture_tile[1].setText(mode)
@@ -802,6 +809,13 @@ class PermissionsPage(Page):
 
 class SettingsPage(Page):
     SWIPE_RANGE = (10, 45)  # Hundredths of the frame width.
+    # Here rather than imported from mini_view, which needs this module.
+    PIN_CORNERS = (
+        ("bottom_right", "Bottom right"),
+        ("bottom_left", "Bottom left"),
+        ("top_right", "Top right"),
+        ("top_left", "Top left"),
+    )
 
     def __init__(self, state: AppState, controller: EngineController) -> None:
         super().__init__("Settings")
@@ -823,6 +837,21 @@ class SettingsPage(Page):
         self.show_preview = Toggle(general.show_preview, "Turning this off saves some computer power.")
         self.show_preview.toggled.connect(lambda on: self._set("show_preview", on))
         form.addRow("Show the camera picture", self.show_preview)
+        self.pin_camera = Toggle(
+            general.pin_camera,
+            "While the app is running and minimized, or in the tray, show the camera in a corner of the screen.",
+        )
+        self.pin_camera.toggled.connect(lambda on: self._set("pin_camera", on))
+        form.addRow("Pin the camera to a corner when minimized", self.pin_camera)
+        self.pin_corner = QComboBox()
+        for key, name in self.PIN_CORNERS:
+            self.pin_corner.addItem(name, key)
+        self.pin_corner.setCurrentIndex(max(self.pin_corner.findData(general.pin_corner), 0))
+        self.pin_corner.currentIndexChanged.connect(lambda _: self._set("pin_corner", self.pin_corner.currentData()))
+        form.addRow("Which corner", self.pin_corner)
+        self.show_preview.toggled.connect(lambda _: self._sync_pin_controls())
+        self.pin_camera.toggled.connect(lambda _: self._sync_pin_controls())
+        self._sync_pin_controls()
         self.camera = QSpinBox()
         self.camera.setRange(0, 9)
         self.camera.setValue(general.camera_index)
@@ -891,6 +920,12 @@ class SettingsPage(Page):
     def _set(self, attr: str, value) -> None:
         setattr(self.state.profile.general, attr, value)
         self.state.save()
+
+    def _sync_pin_controls(self) -> None:
+        # With the camera picture off, there's no picture to pin.
+        preview = self.show_preview.isChecked()
+        self.pin_camera.setEnabled(preview)
+        self.pin_corner.setEnabled(preview and self.pin_camera.isChecked())
 
     def _swipe_changed(self, value: int) -> None:
         self.swipe_value.setText(f"{value}% of the picture")

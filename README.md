@@ -36,10 +36,32 @@ Desktop as well, use **Settings** in the app.
 | **Gestures** | The full list of gestures, each with a picture and an animated demo. Turn them on or off, change what they do, and add your own |
 | **Apps** | Optional. Switch gestures off in an app, or make them do something different there |
 | **Permissions** | What the app is allowed to do. It asks when a gesture needs something new, so you rarely need this page |
-| **Settings** | Starting automatically, the swipe distance, fitting the pinch to your hand, the Desktop icon |
+| **Settings** | Starting automatically, the pinned camera, the swipe distance, fitting the pinch to your hand, the Desktop icon |
 
 Closing the window keeps the app in the system tray, by the clock, and it keeps running if you had
 started it. Right-click the tray icon to stop or quit. `Ctrl+Alt+G` pauses and resumes from any window.
+
+### The pinned camera
+
+While the app is running and you minimize it, or close it to the tray, the camera stays on screen in a small window
+in the bottom right corner. It goes away when you open the app again or press Stop.
+
+| What you see | What it tells you |
+| --- | --- |
+| **Your hand, with its joints drawn on it** | The camera can see your hand. If the lines are missing, it can't |
+| **The rectangle** | The part of the picture that covers your whole screen. Its edges are the edges of your screen |
+| **The ring on your index fingertip** | Teal inside the rectangle. Amber outside it, where the cursor can't go any further. A solid red dot means the mouse button is held down |
+| **The name below the picture** | The gesture the app has settled on, what it's doing now (such as moving the mouse or changing the volume), and what a gesture just did. It also says when the app is paused or in Practice mode |
+| **The small screen, on the right** | Where your finger lands on your screen. A solid dot is the real cursor, while you're pointing. An outline is where the cursor would go if you started pointing |
+
+It stays on top of other windows, but it never takes the keyboard or the mouse: clicks go straight through it to
+whatever is underneath, so the air mouse still works there. To uncover that part of the screen, or to move or turn off
+the window, use **Settings**: **Pin the camera to a corner when minimized** and **Which corner**. Turning off
+**Show the camera picture** turns this off too.
+
+The window shows your camera picture, so **it also appears in screenshots and screen shares.** Nothing is saved or
+sent anywhere. Turn it off in Settings before sharing your screen if you'd rather not show it. On more than one
+monitor, it stays on the main one, which is also the one the air mouse moves on.
 
 ### Using your laptop without a mouse
 
@@ -311,6 +333,12 @@ it only shortens frame preparation.
 - **Clicks miss or don't register:** try **Fit to my hand** under Settings.
 - **Thumbs up or down does nothing:** open your palm first if you're pointing, and hold your thumb straight up or
   down. Sideways doesn't count.
+- **The pinned camera doesn't appear when you minimize:** it only shows while the app is running, so press Start. In
+  Settings, check that **Show the camera picture** and **Pin the camera to a corner when minimized** are both on.
+- **The pinned camera covers something you need:** choose another corner in Settings. Clicks go through it, so you can
+  still use what's underneath.
+- **You can't click or drag the pinned camera:** this is on purpose, so that it never gets in the way of the air mouse.
+  Open the app from the tray icon to make it go away.
 - **Low FPS:** add light. The FPS display reports what the camera actually delivers.
 - **Gestures do nothing inside one particular app:** Windows blocks simulated input to apps running as
   administrator, unless this app is also run as administrator. Task Manager is a common example.
@@ -368,7 +396,7 @@ HandGestureSoftware/
 │   ├── self_test.py         Checks that a built .exe can load everything it needs
 │   ├── overlay.py           HUD drawn on the camera view
 │   ├── calibrate.py         Pinch calibration
-│   └── gui/                 The desktop app: window, pages, add-a-gesture wizard, demos
+│   └── gui/                 The desktop app: window, pages, pinned camera, add-a-gesture wizard, demos
 └── tests/                   Test suite, with landmark data from real hand photos
 ```
 
@@ -396,6 +424,9 @@ Some design choices that are not obvious from the brief:
   cursor is frozen from the first frame of it.
 - **Your own gestures beat the built-in poses.** A thumbs-up gesture saved before thumbs up had a default use keeps
   working as before, and the default is switched off for it.
+- **The pinned camera lets clicks through.** The cursor can reach any corner of the screen in air mouse mode, so a
+  window that took clicks would catch them there. It also never takes focus, so the app in front keeps its own
+  gesture rules.
 - **pynput rather than pyautogui.** pyautogui adds a default delay after each call, which a 30 Hz cursor
   can't afford.
 - **The .exe is a folder build, not a single file.** A single-file .exe would unpack hundreds of megabytes every

@@ -96,6 +96,26 @@ class Overlay:
         if self.debug and reading is not None:
             self._draw_debug(img, reading)
 
+    def draw_compact(self, img: np.ndarray, hand: HandData | None, status: MapperStatus) -> None:
+        """For the pinned camera. It's shown small, so lines are thicker, and its caption replaces the text."""
+        self._draw_active_region(img, thickness=2)
+        if hand is None or not self.ui.draw_landmarks:
+            return
+        h, w = img.shape[:2]
+        pts = (hand.image[:, :2] * (w, h)).astype(np.int32)
+        for a, b in HAND_CONNECTIONS:
+            cv2.line(img, tuple(pts[a]), tuple(pts[b]), ACCENT, 2, cv2.LINE_AA)
+        for p in pts:
+            cv2.circle(img, tuple(p), 3, WHITE, -1, cv2.LINE_AA)
+        tip = tuple(pts[8])
+        if status.mouse_down:
+            cv2.circle(img, tip, 12, RED, -1, cv2.LINE_AA)
+            return
+        # Outside the rectangle the cursor can't go any further, so the ring warns about that.
+        x0, y0, x1, y1 = self.pointer.active_region
+        inside = x0 * w <= tip[0] <= x1 * w and y0 * h <= tip[1] <= y1 * h
+        cv2.circle(img, tip, 12, ACCENT if inside else AMBER, 3, cv2.LINE_AA)
+
     def _draw_status_bar(
         self, img: np.ndarray, tracking: bool, status: MapperStatus, stats: HudStats
     ) -> None:
@@ -152,7 +172,7 @@ class Overlay:
             panel(img, hint_x - 10, 46, hint_x + hint_w + 10, 72)
             text(img, hint, hint_x, 64, 0.42, AMBER)
 
-    def _draw_active_region(self, img: np.ndarray) -> None:
+    def _draw_active_region(self, img: np.ndarray, thickness: int = 1) -> None:
         h, w = img.shape[:2]
         x0, y0, x1, y1 = self.pointer.active_region
         cv2.rectangle(
@@ -160,7 +180,7 @@ class Overlay:
             (int(x0 * w), int(y0 * h)),
             (int(x1 * w), int(y1 * h)),
             ACCENT,
-            1,
+            thickness,
             cv2.LINE_AA,
         )
 

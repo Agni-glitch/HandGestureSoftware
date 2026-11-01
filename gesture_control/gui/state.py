@@ -48,6 +48,8 @@ class EngineController(QObject):
     failed = Signal(str)
     frame_ready = Signal(object)
     stats_ready = Signal(object)
+    # The picture with the stats from the same moment, for what must stay in step with your hand.
+    live_ready = Signal(object, object)
 
     def __init__(self, state: AppState) -> None:
         super().__init__()
@@ -57,6 +59,7 @@ class EngineController(QObject):
         self.practice = False
         # A silent run only exists to watch your hand for a recording. It can't act.
         self.silent = False
+        self.compact_preview = False
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         state.changed.connect(self._push_profile)
@@ -92,6 +95,11 @@ class EngineController(QObject):
         if self.engine is not None:
             self.engine.toggle_pause.set()
 
+    def set_compact_preview(self, compact: bool) -> None:
+        self.compact_preview = compact
+        if self.engine is not None:
+            self.engine.compact_preview = compact
+
     def shutdown(self, timeout: float = 5.0) -> None:
         """Stop and wait, for when the whole app is exiting."""
         self._stop.set()
@@ -118,6 +126,7 @@ class EngineController(QObject):
         os_ctl = DryRunController() if self.practice else SystemController()
         engine = GestureEngine(cfg, os_ctl, profile)
         engine.preview_enabled = profile.general.show_preview or self.silent
+        engine.compact_preview = self.compact_preview
         return engine
 
     def _run(self, stop: threading.Event) -> None:
@@ -144,6 +153,7 @@ class EngineController(QObject):
                 if image is not None and now - last_frame >= _FRAME_INTERVAL_S:
                     last_frame = now
                     self.frame_ready.emit(image)
+                    self.live_ready.emit(image, stats)
                 if now - last_stats >= _STATS_INTERVAL_S:
                     last_stats = now
                     self.stats_ready.emit(stats)

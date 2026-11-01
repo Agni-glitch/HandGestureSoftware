@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from config import AppConfig
-from gesture_control.actions import ActionMapper, MapperStatus, Mode
+from gesture_control.actions import ActionMapper, MapperStatus, Mode, screen_fraction
 from gesture_control.capture import CameraStream
 from gesture_control.custom_gestures import CustomMatcher, pose_features, ready_pose_of
 from gesture_control.detection import HandData, HandDetector
@@ -30,6 +30,8 @@ class EngineStats:
     inference_ms: float
     tracking: bool
     status: MapperStatus
+    # The cursor, or where your fingertip would put it, as a fraction of the screen.
+    screen_position: tuple[float, float] | None = None
 
 
 @dataclass
@@ -63,6 +65,7 @@ class GestureEngine:
         self.overlay = Overlay(cfg.ui, cfg.pointer, debug=debug)
         self.matcher = CustomMatcher([])
         self.preview_enabled = True
+        self.compact_preview = False
         self.toggle_pause = threading.Event()
         self.sampler: Sampler | None = None
         self._pending_profile: Profile | None = None
@@ -121,6 +124,15 @@ class GestureEngine:
                     self.ready_gestures.get(ready) or self.matcher.match(features) or self.builtin_poses.get(ready)
                 )
         return reading
+
+    def _screen_position(self, reading: GestureReading | None, status: MapperStatus) -> tuple[float, float] | None:
+        # The real cursor comes first: it stays put during a click, even though the fingertip moves.
+        if status.cursor is not None:
+            return status.cursor
+        if reading is None:
+            return None
+        x, y = screen_fraction(self.cfg.pointer.active_region, reading.index_tip)
+        return float(x), float(y)
 
     def run(
         self,
@@ -185,9 +197,13 @@ class GestureEngine:
                 latest_ms = inference_ms[-1] if inference_ms else 0.0
                 image = None
                 if self.preview_enabled:
-                    self.overlay.draw(frame.bgr, hand, reading, status, HudStats(fps, latest_ms), now)
+                    if self.compact_preview:
+                        self.overlay.draw_compact(frame.bgr, hand, status)
+                    else:
+                        self.overlay.draw(frame.bgr, hand, reading, status, HudStats(fps, latest_ms), now)
                     image = frame.bgr
-                on_frame(image, EngineStats(fps, latest_ms, hand is not None, status))
+                position = self._screen_position(reading, status)
+                on_frame(image, EngineStats(fps, latest_ms, hand is not None, status, position))
         finally:
             # Runs on any exit, so a held mouse button is never left pressed.
             self.mapper.close(time.monotonic())

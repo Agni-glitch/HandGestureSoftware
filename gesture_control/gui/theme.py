@@ -43,6 +43,12 @@ QToolTip {{ background: {CARD}; color: {TEXT}; border: 1px solid {BORDER}; paddi
 #tileValue {{ font-size: 24px; font-weight: 600; }}
 #tileLabel {{ color: {MUTED}; font-size: 12px; }}
 #preview {{ background: #0b0d0f; border-radius: 8px; color: {MUTED}; }}
+#miniView {{ background: {BG}; border: 1px solid {BORDER}; }}
+#miniPicture {{ background: #0b0d0f; color: {MUTED}; }}
+#miniTitle {{ font-size: 15px; font-weight: 600; }}
+#miniTitle[tone="active"] {{ color: {ACCENT}; }}
+#miniTitle[tone="paused"] {{ color: {AMBER}; }}
+#miniDetail {{ color: {MUTED}; font-size: 12px; }}
 
 QPushButton {{
     background: {CARD_HOVER}; border: 1px solid {BORDER}; border-radius: 7px;
