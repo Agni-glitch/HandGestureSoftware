@@ -13,7 +13,7 @@ numpy==2.5.4; python_version >= "3.12"
 # This replaces opencv-python: MediaPipe depends on the contrib build, and the
 # two packages overwrite each other's cv2 files if both are installed.
 opencv-contrib-python==5.0.0.93; sys_platform != "darwin"
-opencv-contrib-python==4.10.0.84; sys_platform == "darwin"
+opencv-contrib-python==5.0.0.93; sys_platform == "darwin"
 
 # Windows system volume (macOS and Linux use osascript and pactl).
 pycaw==20260927; sys_platform == "win32"
